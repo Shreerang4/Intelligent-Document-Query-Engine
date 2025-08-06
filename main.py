@@ -12,6 +12,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from sentence_transformers import CrossEncoder
 
+# (No changes to Pydantic models, helper functions, or FastAPI app setup)
 # --- Load Environment Variables ---
 load_dotenv()
 
@@ -32,17 +33,17 @@ app = FastAPI(
 
 EXPECTED_TOKEN = "b67c9abf3c4db8e30556bc012a00cdb3f4072ccd6502a59372dc1aa1cc24f14d"
 
-# --- Load Models on Startup (The Fix) ---
-# These models are now loaded once into global variables when the app starts.
-print("Loading models into memory...")
-embedding_model = HuggingFaceEmbeddings(model_name="BAAI/bge-small-en-v1.5")
-reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+# --- Load Models on Startup (Using Lighter Models) ---
+print("Loading lightweight models into memory...")
+# Switched to a smaller embedding model
+embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2") 
+# Switched to a smaller reranker model
+reranker = CrossEncoder('cross-encoder/ms-marco-TinyBERT-L-2-v2') 
 print("Models loaded successfully.")
 
 
 # --- RAG Core Logic Functions ---
 def load_and_chunk_pdf(url: str):
-    # This function remains the same
     print(f"Loading document from: {url}")
     try:
         response = requests.get(url)
@@ -68,7 +69,6 @@ def load_and_chunk_pdf(url: str):
     return chunks
 
 def create_vector_store(chunks: list[str], embedding_model):
-    # This function remains the same
     if not chunks:
         raise HTTPException(status_code=400, detail="No text chunks to process.")
     
@@ -81,7 +81,6 @@ def create_vector_store(chunks: list[str], embedding_model):
     return index
 
 def generate_final_answer(question: str, context: str):
-    # This function remains the same
     print("Generating final answer with LLM...")
     try:
         client = Groq()
@@ -109,37 +108,26 @@ async def run_query_pipeline(
     request: QueryRequest,
     authorization: Optional[str] = Header(None)
 ):
-    # 1. Authentication
     if not authorization or not authorization.startswith("Bearer ") or authorization.split("Bearer ")[1] != EXPECTED_TOKEN:
         raise HTTPException(status_code=401, detail="Invalid authorization token")
 
-    # The model loading lines have been REMOVED from here.
-    # The endpoint now uses the models pre-loaded in the global scope.
-    
-    # 2. Load and Chunk Document
     doc_chunks = load_and_chunk_pdf(str(request.documents))
-    
-    # 3. Create Vector Store
     faiss_index = create_vector_store(doc_chunks, embedding_model)
     
     final_answers = []
-    # 4. Loop Through Questions
     for question in request.questions:
         print(f"\nProcessing question: '{question}'")
         
-        # 5. Retrieve
         question_embedding = embedding_model.embed_query(question)
         question_embedding_np = np.array([question_embedding]).astype('float32')
         k_initial = 10
         distances, indices = faiss_index.search(question_embedding_np, k_initial)
         retrieved_chunks = [doc_chunks[i] for i in indices[0]]
         
-        # 6. Rerank
         rerank_pairs = [[question, chunk] for chunk in retrieved_chunks]
         rerank_scores = reranker.predict(rerank_pairs)
         reranked_results = sorted(zip(retrieved_chunks, rerank_scores), key=lambda x: x[1], reverse=True)
         
-        # 7. Generate
         top_k_final = 3
         final_context = "\n\n".join([chunk for chunk, score in reranked_results[:top_k_final]])
         answer = generate_final_answer(question, final_context)
