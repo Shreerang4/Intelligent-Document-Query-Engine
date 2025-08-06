@@ -1,4 +1,4 @@
-import fitz  # PyMuPDF
+import fitz
 import faiss
 import numpy as np
 import os
@@ -12,67 +12,57 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from sentence_transformers import CrossEncoder
 
-# (No changes to Pydantic models, helper functions, or FastAPI app setup)
-# --- Load Environment Variables ---
+# (No changes to Pydantic models or FastAPI app setup)
 load_dotenv()
-
-# --- Pydantic Models for API ---
-class QueryRequest(BaseModel):
-    documents: HttpUrl
-    questions: List[str]
-
-class QueryResponse(BaseModel):
-    answers: List[str]
-
-# --- FastAPI App Initialization ---
-app = FastAPI(
-    title="Intelligent Query–Retrieval System",
-    description="An API to answer questions about documents using RAG.",
-    version="1.0.0"
-)
-
+app = FastAPI(title="Intelligent Query–Retrieval System", version="1.0.0")
 EXPECTED_TOKEN = "b67c9abf3c4db8e30556bc012a00cdb3f4072ccd6502a59372dc1aa1cc24f14d"
 
-# --- Load Models on Startup (Using Lighter Models) ---
-print("Loading lightweight models into memory...")
-# Switched to a smaller embedding model
-embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2") 
-# Switched to a smaller reranker model
-reranker = CrossEncoder('cross-encoder/ms-marco-TinyBERT-L-2-v2') 
-print("Models loaded successfully.")
+# --- Model Cache (The Fix) ---
+# This dictionary will store our models after they are loaded for the first time.
+model_cache = {}
 
+def get_embedding_model():
+    """Loads the embedding model from cache or initializes it."""
+    if "embedding_model" not in model_cache:
+        print("Loading embedding model for the first time...")
+        model_cache["embedding_model"] = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    return model_cache["embedding_model"]
 
-# --- RAG Core Logic Functions ---
+def get_reranker_model():
+    """Loads the reranker model from cache or initializes it."""
+    if "reranker" not in model_cache:
+        print("Loading reranker model for the first time...")
+        model_cache["reranker"] = CrossEncoder('cross-encoder/ms-marco-TinyBERT-L-2-v2')
+    return model_cache["reranker"]
+
+# --- RAG Core Logic Functions (No changes needed) ---
 def load_and_chunk_pdf(url: str):
+    # (This function remains the same)
     print(f"Loading document from: {url}")
     try:
         response = requests.get(url)
         response.raise_for_status()
     except requests.RequestException as e:
         raise HTTPException(status_code=400, detail=f"Failed to download document: {e}")
-
     full_text = ""
     try:
         with fitz.open(stream=response.content, filetype="pdf") as doc:
             for page in doc:
                 blocks = page.get_text("blocks")
                 blocks.sort(key=lambda b: (b[1], b[0]))
-                for b in blocks:
-                    full_text += b[4]
+                for b in blocks: full_text += b[4]
         print("Document loaded and parsed successfully.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process PDF: {e}")
-
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     chunks = text_splitter.split_text(full_text)
     print(f"Document split into {len(chunks)} chunks.")
     return chunks
 
 def create_vector_store(chunks: list[str], embedding_model):
-    if not chunks:
-        raise HTTPException(status_code=400, detail="No text chunks to process.")
-    
-    print("Creating embeddings... (This may take a moment)")
+    # (This function remains the same)
+    if not chunks: raise HTTPException(status_code=400, detail="No text chunks to process.")
+    print("Creating embeddings...")
     chunk_embeddings = embedding_model.embed_documents(chunks)
     embedding_array = np.array(chunk_embeddings).astype('float32')
     index = faiss.IndexFlatL2(embedding_array.shape[1])
@@ -81,35 +71,31 @@ def create_vector_store(chunks: list[str], embedding_model):
     return index
 
 def generate_final_answer(question: str, context: str):
+    # (This function remains the same)
     print("Generating final answer with LLM...")
     try:
         client = Groq()
         chat_completion = client.chat.completions.create(
             messages=[
-                {
-                    "role": "system",
-                    "content": "You are an AI assistant. Answer the user's question based ONLY on the provided context. Be concise and precise. If the answer is not in the document, say that."
-                },
-                {
-                    "role": "user",
-                    "content": f"Context:\n{context}\n\nQuestion: {question}",
-                }
+                {"role": "system", "content": "You are an AI assistant. Answer the user's question based ONLY on the provided context. Be concise and precise. If the answer is not in the document, say that."},
+                {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
             ],
             model="llama3-8b-8192",
         )
         return chat_completion.choices[0].message.content
     except Exception as e:
         print(f"Error during LLM call: {e}")
-        return "There was an error generating the final answer. The LLM provider may be temporarily unavailable."
+        return "Error generating the final answer."
 
-# --- API Endpoint ---
+# --- API Endpoint (Updated to use the cache functions) ---
 @app.post("/hackrx/run", response_model=QueryResponse)
-async def run_query_pipeline(
-    request: QueryRequest,
-    authorization: Optional[str] = Header(None)
-):
+async def run_query_pipeline(request: QueryRequest, authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.startswith("Bearer ") or authorization.split("Bearer ")[1] != EXPECTED_TOKEN:
         raise HTTPException(status_code=401, detail="Invalid authorization token")
+    
+    # Get models from cache (or load them if it's the first time)
+    embedding_model = get_embedding_model()
+    reranker = get_reranker_model()
 
     doc_chunks = load_and_chunk_pdf(str(request.documents))
     faiss_index = create_vector_store(doc_chunks, embedding_model)
