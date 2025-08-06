@@ -32,10 +32,17 @@ app = FastAPI(
 
 EXPECTED_TOKEN = "b67c9abf3c4db8e30556bc012a00cdb3f4072ccd6502a59372dc1aa1cc24f14d"
 
-# --- RAG Core Logic Functions ---
+# --- Load Models on Startup (The Fix) ---
+# These models are now loaded once into global variables when the app starts.
+print("Loading models into memory...")
+embedding_model = HuggingFaceEmbeddings(model_name="BAAI/bge-small-en-v1.5")
+reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+print("Models loaded successfully.")
 
+
+# --- RAG Core Logic Functions ---
 def load_and_chunk_pdf(url: str):
-    """Downloads a PDF from a URL, extracts text, and chunks it."""
+    # This function remains the same
     print(f"Loading document from: {url}")
     try:
         response = requests.get(url)
@@ -61,7 +68,7 @@ def load_and_chunk_pdf(url: str):
     return chunks
 
 def create_vector_store(chunks: list[str], embedding_model):
-    """Creates embeddings and builds a FAISS index."""
+    # This function remains the same
     if not chunks:
         raise HTTPException(status_code=400, detail="No text chunks to process.")
     
@@ -74,7 +81,7 @@ def create_vector_store(chunks: list[str], embedding_model):
     return index
 
 def generate_final_answer(question: str, context: str):
-    """Uses an LLM to generate a final, clean answer from the context."""
+    # This function remains the same
     print("Generating final answer with LLM...")
     try:
         client = Groq()
@@ -106,9 +113,8 @@ async def run_query_pipeline(
     if not authorization or not authorization.startswith("Bearer ") or authorization.split("Bearer ")[1] != EXPECTED_TOKEN:
         raise HTTPException(status_code=401, detail="Invalid authorization token")
 
-    # --- Initialize Models (loaded once per server start, but here for simplicity) ---
-    embedding_model = HuggingFaceEmbeddings(model_name="BAAI/bge-small-en-v1.5")
-    reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+    # The model loading lines have been REMOVED from here.
+    # The endpoint now uses the models pre-loaded in the global scope.
     
     # 2. Load and Chunk Document
     doc_chunks = load_and_chunk_pdf(str(request.documents))
