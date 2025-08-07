@@ -31,7 +31,7 @@ RUN pip install sentence-transformers==5.0.0 --no-deps && \
 COPY . /app/
 
 # Make scripts executable
-RUN chmod +x build.sh && chmod +x start.sh
+RUN chmod +x build.sh && chmod +x start.sh && chmod +x start.py
 
 # Run the build script
 RUN ./build.sh
@@ -44,5 +44,5 @@ RUN apt-get clean && \
 # Expose port
 EXPOSE 8000
 
-# Run the application with explicit PORT handling
-CMD ["/bin/bash", "-c", "PORT=${PORT:-8000} && echo \"Starting on port $PORT\" && uvicorn main:app --host 0.0.0.0 --port $PORT"] 
+# Run the application with Python startup script
+CMD ["python", "start.py"] 
