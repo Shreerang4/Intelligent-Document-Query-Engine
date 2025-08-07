@@ -26,6 +26,11 @@ RUN chmod +x build.sh
 # Run the build script
 RUN ./build.sh
 
+# Clean up to reduce image size
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    pip cache purge
+
 # Expose port
 EXPOSE 8000
 
