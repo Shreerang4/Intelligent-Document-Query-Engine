@@ -15,7 +15,13 @@ COPY requirements.txt .
 # Create virtual environment and install dependencies
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install --upgrade pip && pip install -r requirements.txt
+
+# Install PyTorch CPU version first
+RUN pip install --upgrade pip && \
+    pip install torch==2.7.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+
+# Install other requirements (excluding torch)
+RUN pip install -r requirements.txt
 
 # Copy application code
 COPY . /app/
