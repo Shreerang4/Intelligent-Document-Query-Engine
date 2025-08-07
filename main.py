@@ -13,6 +13,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from sentence_transformers import CrossEncoder
 import asyncio
 import time
+import gc
 
 load_dotenv()
 
@@ -64,7 +65,9 @@ def load_and_chunk_pdf(url: str):
         print("Document loaded and parsed successfully.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process PDF: {e}")
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    
+    # Use smaller chunks to reduce memory usage
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=30)
     chunks = text_splitter.split_text(full_text)
     print(f"Document split into {len(chunks)} chunks.")
     return chunks
@@ -108,6 +111,10 @@ async def run_query_pipeline(request: QueryRequest, authorization: Optional[str]
     print(f"Starting processing at {start_time}")
     
     try:
+        # Limit to 5 questions maximum to prevent overload
+        if len(request.questions) > 5:
+            raise HTTPException(status_code=400, detail="Maximum 5 questions allowed per request")
+        
         embedding_model = get_embedding_model()
         reranker = get_reranker_model()
 
@@ -120,7 +127,7 @@ async def run_query_pipeline(request: QueryRequest, authorization: Optional[str]
             
             question_embedding = embedding_model.embed_query(question)
             question_embedding_np = np.array([question_embedding]).astype('float32')
-            k_initial = 10
+            k_initial = 5  # Reduced from 10 to save memory
             distances, indices = faiss_index.search(question_embedding_np, k_initial)
             retrieved_chunks = [doc_chunks[i] for i in indices[0]]
             
@@ -128,12 +135,15 @@ async def run_query_pipeline(request: QueryRequest, authorization: Optional[str]
             rerank_scores = reranker.predict(rerank_pairs)
             reranked_results = sorted(zip(retrieved_chunks, rerank_scores), key=lambda x: x[1], reverse=True)
             
-            top_k_final = 3
+            top_k_final = 2  # Reduced from 3 to save memory
             final_context = "\n\n".join([chunk for chunk, score in reranked_results[:top_k_final]])
             answer = generate_final_answer(question, final_context)
             final_answers.append(answer)
             
             print(f"Completed question {i+1} in {time.time() - start_time:.2f}s")
+            
+            # Force garbage collection after each question
+            gc.collect()
 
         total_time = time.time() - start_time
         print(f"Total processing time: {total_time:.2f}s")
