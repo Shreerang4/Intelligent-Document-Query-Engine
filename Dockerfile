@@ -30,8 +30,8 @@ RUN pip install sentence-transformers==5.0.0 --no-deps && \
 # Copy application code
 COPY . /app/
 
-# Make build.sh executable
-RUN chmod +x build.sh
+# Make scripts executable
+RUN chmod +x build.sh && chmod +x start.sh
 
 # Run the build script
 RUN ./build.sh
@@ -44,5 +44,5 @@ RUN apt-get clean && \
 # Expose port
 EXPOSE 8000
 
-# Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"] 
+# Run the application with startup script
+CMD ["./start.sh"] 
