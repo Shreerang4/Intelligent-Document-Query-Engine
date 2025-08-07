@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY requirements-no-torch.txt requirements.txt
 
 # Create virtual environment and install dependencies
 RUN python -m venv /opt/venv
@@ -20,8 +20,12 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --upgrade pip && \
     pip install torch==2.7.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
 
-# Install other requirements (excluding torch)
+# Install other requirements (excluding PyTorch dependencies)
 RUN pip install -r requirements.txt
+
+# Install sentence-transformers separately to avoid PyTorch conflicts
+RUN pip install sentence-transformers==5.0.0 --no-deps && \
+    pip install transformers==4.55.0 --no-deps
 
 # Copy application code
 COPY . /app/
