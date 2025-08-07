@@ -18,7 +18,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Install PyTorch CPU version first
 RUN pip install --upgrade pip && \
-    pip install torch==2.7.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+    pip install torch --index-url https://download.pytorch.org/whl/cpu
 
 # Install other requirements (excluding PyTorch dependencies)
 RUN pip install -r requirements.txt
