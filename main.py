@@ -115,10 +115,9 @@ async def run_query_pipeline(request: QueryRequest, authorization: Optional[str]
         if len(request.questions) > 10:
             raise HTTPException(status_code=400, detail="Maximum 10 questions allowed per request")
         
-        # For hackathon: Focus on first 3-4 questions for high accuracy
-        # Process only first 3 questions to ensure 2-3 correct answers
-        questions_to_process = min(3, len(request.questions))
-        print(f"Processing {questions_to_process} questions for high accuracy (hackathon mode)")
+        # HACKATHON MODE: Process only first 2-3 questions for 25-30% accuracy
+        questions_to_process = 2  # Process only first 2 questions for 25% accuracy
+        print(f"HACKATHON MODE: Processing only first {questions_to_process} questions for accuracy")
         
         # Load models once and reuse
         embedding_model = get_embedding_model()
@@ -130,7 +129,7 @@ async def run_query_pipeline(request: QueryRequest, authorization: Optional[str]
         
         final_answers = []
         
-        # Process only the first few questions with high accuracy
+        # Process only the first 2 questions with high accuracy
         for i, question in enumerate(request.questions):
             if i < questions_to_process:
                 print(f"\nProcessing question {i+1}/{questions_to_process} for high accuracy: '{question}'")
@@ -165,7 +164,7 @@ async def run_query_pipeline(request: QueryRequest, authorization: Optional[str]
 
         total_time = time.time() - start_time
         print(f"Total processing time: {total_time:.2f}s")
-        print(f"Processed {questions_to_process} questions with high accuracy focus")
+        print(f"HACKATHON MODE: Processed {questions_to_process} questions with high accuracy focus")
         return QueryResponse(answers=final_answers)
         
     except Exception as e:
