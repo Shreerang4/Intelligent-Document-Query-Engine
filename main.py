@@ -94,7 +94,7 @@ def generate_final_answer(question: str, context: str):
                 {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
             ],
             model="llama3-8b-8192",
-            timeout=60  # Add timeout
+            timeout=90  # Increased timeout for 10 questions
         )
         return chat_completion.choices[0].message.content
     except Exception as e:
@@ -111,13 +111,17 @@ async def run_query_pipeline(request: QueryRequest, authorization: Optional[str]
     print(f"Starting processing at {start_time}")
     
     try:
-        # Limit to 5 questions maximum to prevent overload
-        if len(request.questions) > 5:
-            raise HTTPException(status_code=400, detail="Maximum 5 questions allowed per request")
+        # Allow up to 10 questions for hackathon requirements
+        if len(request.questions) > 10:
+            raise HTTPException(status_code=400, detail="Maximum 10 questions allowed per request")
         
+        print(f"Processing {len(request.questions)} questions...")
+        
+        # Load models once and reuse
         embedding_model = get_embedding_model()
         reranker = get_reranker_model()
 
+        # Process document once and reuse for all questions
         doc_chunks = load_and_chunk_pdf(str(request.documents))
         faiss_index = create_vector_store(doc_chunks, embedding_model)
         
@@ -125,24 +129,29 @@ async def run_query_pipeline(request: QueryRequest, authorization: Optional[str]
         for i, question in enumerate(request.questions):
             print(f"\nProcessing question {i+1}/{len(request.questions)}: '{question}'")
             
-            question_embedding = embedding_model.embed_query(question)
-            question_embedding_np = np.array([question_embedding]).astype('float32')
-            k_initial = 5  # Reduced from 10 to save memory
-            distances, indices = faiss_index.search(question_embedding_np, k_initial)
-            retrieved_chunks = [doc_chunks[i] for i in indices[0]]
+            try:
+                question_embedding = embedding_model.embed_query(question)
+                question_embedding_np = np.array([question_embedding]).astype('float32')
+                k_initial = 5  # Keep this optimized for memory
+                distances, indices = faiss_index.search(question_embedding_np, k_initial)
+                retrieved_chunks = [doc_chunks[i] for i in indices[0]]
+                
+                rerank_pairs = [[question, chunk] for chunk in retrieved_chunks]
+                rerank_scores = reranker.predict(rerank_pairs)
+                reranked_results = sorted(zip(retrieved_chunks, rerank_scores), key=lambda x: x[1], reverse=True)
+                
+                top_k_final = 2  # Keep this optimized for memory
+                final_context = "\n\n".join([chunk for chunk, score in reranked_results[:top_k_final]])
+                answer = generate_final_answer(question, final_context)
+                final_answers.append(answer)
+                
+                print(f"Completed question {i+1} in {time.time() - start_time:.2f}s")
+                
+            except Exception as e:
+                print(f"Error processing question {i+1}: {e}")
+                final_answers.append(f"Error processing question: {str(e)}")
             
-            rerank_pairs = [[question, chunk] for chunk in retrieved_chunks]
-            rerank_scores = reranker.predict(rerank_pairs)
-            reranked_results = sorted(zip(retrieved_chunks, rerank_scores), key=lambda x: x[1], reverse=True)
-            
-            top_k_final = 2  # Reduced from 3 to save memory
-            final_context = "\n\n".join([chunk for chunk, score in reranked_results[:top_k_final]])
-            answer = generate_final_answer(question, final_context)
-            final_answers.append(answer)
-            
-            print(f"Completed question {i+1} in {time.time() - start_time:.2f}s")
-            
-            # Force garbage collection after each question
+            # Force garbage collection after each question to manage memory
             gc.collect()
 
         total_time = time.time() - start_time
