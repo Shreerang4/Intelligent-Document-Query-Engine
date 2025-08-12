@@ -87,8 +87,3 @@ docker run -p 8000:8000 doc-query-engine
 * **LLM API:** Groq (Llama 3)
 * **Reranking:** SentenceTransformers CrossEncoder
 * **Deployment:** Docker, Railway
-
----
-
-If you want, I can now **clean `main.py` to remove all hackathon-specific code** so the logic is consistent with this general-purpose README.
-Do you want me to proceed with that cleanup?
