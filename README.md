@@ -1,141 +1,94 @@
-# Bajaj Hackathon RAG API
+# Intelligent Document Query Engine
 
-A FastAPI-based Retrieval-Augmented Generation (RAG) system that can answer questions from insurance policy documents. The system is optimized for hackathon requirements and can handle up to 10 questions per request.
+A **cloud-native, LLM-powered query-retrieval system** designed to perform **contextual analysis** on large, unstructured documents. Built for scalable, production-ready deployments.
 
 ## 🚀 Features
 
-- **Document Processing**: Supports PDF documents from URLs
-- **Question Answering**: Handles up to 10 questions per request
-- **RAG Pipeline**: Uses embedding models, FAISS vector search, and LLM generation
-- **Memory Optimized**: Efficient memory management for large document processing
-- **Production Ready**: Deployed on Railway with health checks
+* **Retrieval-Augmented Generation (RAG)** pipeline using:
 
-## 📋 Hackathon Requirements
+  * **`faiss-cpu`** for efficient vector indexing
+  * **`sentence-transformers` CrossEncoder** for high-precision reranking
+* **Llama 3 LLM integration** via the **Groq API** for final answer synthesis
+* **Fine-tuned role-based system prompt** for domain-specific query responses
+* **Lazy-loading pattern** for large AI models to optimize memory and performance
+* **FastAPI backend** with REST endpoints for document ingestion and query answering
+* **Docker-based deployment** for reproducibility and scalability
 
-The system now supports the full hackathon evaluation with 10 comprehensive questions:
+## 🌐 Live Demo
 
-1. Grace period for premium payment
-2. Waiting period for pre-existing diseases
-3. Coverage limits for medical expenses
-4. Policy term and renewal process
-5. Exclusions and limitations
-6. Claim settlement process
-7. Premium payment options
-8. Hospitalization coverage and room rent
-9. Outpatient treatment benefits
-10. Family member management process
+The application is deployed on **Railway** and available here:
+[API Documentation (Swagger UI)](https://bajajhack-production-cf2c.up.railway.app/docs)
 
-## 🛠️ API Endpoints
+## 📂 Project Structure
 
-### Main Endpoint
 ```
-POST /hackrx/run
+├── main.py                 # FastAPI entry point
+├── requirements.txt        # Dependencies
+├── Dockerfile              # Container build setup
+├── start.py / start.sh     # Application startup scripts
+├── test_*.py               # API test scripts
+└── deploy.sh / deploy.bat  # Deployment scripts
 ```
 
-**Headers:**
-```
-Authorization: Bearer b67c9abf3c4db8e30556bc012a00cdb3f4072ccd6502a59372dc1aa1cc24f14d
-Content-Type: application/json
-```
+## ⚙️ Installation & Setup
 
-**Request Body:**
-```json
-{
-  "documents": "https://example.com/policy.pdf",
-  "questions": [
-    "What is the grace period for premium payment?",
-    "What is the waiting period for pre-existing diseases?"
-  ]
-}
-```
+1. **Clone the repository**
 
-**Response:**
-```json
-{
-  "answers": [
-    "The grace period is 30 days...",
-    "The waiting period is 48 months..."
-  ]
-}
-```
+   ```bash
+   git clone https://github.com/yourusername/intelligent-document-query-engine.git
+   cd intelligent-document-query-engine
+   ```
 
-### Health Check
-```
-GET /health
-```
+2. **Install dependencies**
 
-## 🧪 Testing
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-### Python Test
-```bash
-python test_hackathon.py
-```
+3. **Set environment variables**
+   Create a `.env` file with:
 
-### PowerShell Test
-```powershell
-.\test_hackathon.ps1
-```
+   ```
+   GROQ_API_KEY=your_groq_api_key
+   ```
 
-### Simple Test (2 questions)
-```bash
-python test_api.py
-```
+4. **Run locally**
 
-## 🚀 Deployment
+   ```bash
+   uvicorn main:app --reload
+   ```
 
-### Using Railway CLI
+## ☁️ Deployment
 
-**Linux/Mac:**
-```bash
-chmod +x deploy.sh
-./deploy.sh
-```
+This project supports Railway deployment (Docker-based):
 
-**Windows:**
-```cmd
-deploy.bat
-```
-
-### Manual Deployment
 ```bash
 railway up
 ```
 
-## 📊 Performance Optimizations
+or locally via Docker:
 
-- **Memory Management**: Garbage collection after each question
-- **Model Caching**: Embedding and reranker models cached in memory
-- **Document Processing**: Single document processing for multiple questions
-- **Timeout Handling**: 90-second timeout per LLM call
-- **Error Handling**: Graceful error handling for individual questions
+```bash
+docker build -t doc-query-engine .
+docker run -p 8000:8000 doc-query-engine
+```
 
-## 🔧 Technical Stack
+## 📈 Performance Optimizations
 
-- **FastAPI**: Web framework
-- **PyMuPDF**: PDF processing
-- **FAISS**: Vector similarity search
-- **Sentence Transformers**: Embedding models
-- **Groq**: LLM API for answer generation
-- **Railway**: Deployment platform
+* Lazy loading of embedding and reranker models
+* FAISS in-memory index creation for efficient retrieval
+* Batched query processing for speed
+* Role-based prompts to reduce token usage
 
-## 📈 Recent Updates
+## 🧠 Tech Stack
 
-- ✅ Removed 5-question limit
-- ✅ Added support for 10 questions
-- ✅ Optimized memory usage
-- ✅ Enhanced error handling
-- ✅ Created comprehensive test suite
-- ✅ Added deployment scripts
+* **Backend:** Python, FastAPI
+* **Vector Indexing:** FAISS
+* **LLM API:** Groq (Llama 3)
+* **Reranking:** SentenceTransformers CrossEncoder
+* **Deployment:** Docker, Railway
 
-## 🎯 Hackathon Ready
+---
 
-The system is now fully optimized for hackathon evaluation with:
-- Support for 10 questions per request
-- Comprehensive error handling
-- Performance monitoring
-- Easy deployment and testing
-- Production-ready API endpoints
-
-## 📞 Support
-
-For hackathon-related issues or questions, refer to the test files and deployment scripts provided.
+If you want, I can now **clean `main.py` to remove all hackathon-specific code** so the logic is consistent with this general-purpose README.
+Do you want me to proceed with that cleanup?
